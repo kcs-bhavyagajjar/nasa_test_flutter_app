@@ -4,12 +4,16 @@
 
 import 'dart:convert';
 
+final String tableNotes = 'note';
+
 Imagemodel imagemodelFromJson(String str) =>
     Imagemodel.fromJson(json.decode(str));
 
 String imagemodelToJson(Imagemodel data) => json.encode(data.toJson());
 
 class Imagemodel {
+  static const String id = '_id';
+
   Imagemodel({
     required this.collection,
   });
@@ -21,8 +25,8 @@ class Imagemodel {
       );
 
   Map<String, dynamic> toJson() => {
-        "collection": collection.toJson(),
-      };
+    "collection": collection.toJson(),
+  };
 }
 
 class Collection {
@@ -34,6 +38,7 @@ class Collection {
     required this.links,
   });
 
+  static final String id = '_id';
   String version;
   String href;
   List<Item> items;
@@ -49,7 +54,9 @@ class Collection {
             json["links"].map((x) => CollectionLink.fromJson(x))),
       );
 
-  Map<String, dynamic> toJson() => {
+  Map<String, dynamic> toJson() =>
+      {
+        "id": id,
         "version": version,
         "href": href,
         "items": List<dynamic>.from(items.map((x) => x.toJson())),

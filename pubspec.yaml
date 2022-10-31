@@ -30,9 +30,12 @@ dependencies:
   flutter:
     sdk: flutter
   sqflite:
+  path_provider:
   flutter_bloc: ^8.1.1
   equatable: ^2.0.3
   flutter_swiper_null_safety: ^1.0.2
+  cached_network_image:
+
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -47,7 +50,7 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^2.0.0
+  flutter_lints: ^1.0.0
   http:
   webview_flutter:
   shared_preferences: ^2.0.15
@@ -55,6 +58,9 @@ dev_dependencies:
   flutter_animated_dialog: ^2.0.1
   dart_ipify: ^1.1.1
   connectivity_plus: ^2.3.9
+  jiffy: ^5.0.0
+  video_player: ^2.4.7
+
 
 
 

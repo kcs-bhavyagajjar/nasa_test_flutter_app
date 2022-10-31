@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import "package:http/http.dart" as http;
 import 'package:test_app/Detail.dart';
+import 'package:test_app/Model/customermodel.dart';
 import 'package:test_app/Model/imagemodel.dart';
 
 class DisplayApi extends StatefulWidget {
@@ -15,69 +15,80 @@ class DisplayApi extends StatefulWidget {
 }
 
 List<Item> verticalData = [];
+List<Datamodeldetail> notes = [];
 
 class _DisplayApiState extends State<DisplayApi> {
-  Collection? collection = null;
+  Collection? collection;
   String uri = "https://images-api.nasa.gov/search?q=moon&page=1";
-  String lasturi = "https://images-api.nasa.gov/search?q=moon&page=101";
-  String status = "";
-  bool hideui = false;
   String nextUrl = "";
   bool _hasNextPage = true;
-  bool _isFirstLoadRunning = false;
-  bool isLoadingVertical = false;
-  bool _isLoadMoreRunning = false;
   late ScrollController _controller;
-  final _connectivity = Connectivity();
   late StreamSubscription _streamSubscription;
+  bool isLoading = false;
+  bool isFirstLoading = false;
+  var scroll = ScrollController();
+  var preventCall = false;
 
-  void checkConnectivity() async {
-    _streamSubscription = _connectivity.onConnectivityChanged.listen((event) {
-      if (event == ConnectivityResult.mobile ||
-          event == ConnectivityResult.wifi) {
-        setState(() {
-          hideui = false;
-        });
-      } else {
-        setState(() {
-          hideui = true;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("No internet conection")));
-        status = "No Internet connection";
+  // Future checkConnectivity() async {
+  //   var connectivityResult = await (Connectivity().checkConnectivity());
+  //   if (connectivityResult == ConnectivityResult.mobile ||
+  //       connectivityResult == ConnectivityResult.wifi) {
+  //     setState(() {
+  //       isLoading = false;
+  //     });
+  //   } else {
+  //     var databaseadd = await NotesDatabase.instance.readAllNotes();
+  //     setState(() async {
+  //       notes = databaseadd;
+  //       isLoading = false;
+  //     });
+  //   }
+  // }
+
+  void onScroll() {
+    var position = scroll.position.pixels;
+    if (position >= scroll.position.maxScrollExtent - 10) {
+      if (!preventCall) {
+        _loadMore().then((_) => preventCall = false);
+        preventCall = true;
       }
-    });
+    }
   }
 
   @override
   void initState() {
     super.initState();
-    checkConnectivity();
     fetchData(uri);
-    _controller = ScrollController()..addListener(_loadMore);
+    _controller = ScrollController()..addListener(onScroll);
   }
 
   @override
   void dispose() {
     _streamSubscription.cancel();
-    _controller.removeListener(_loadMore);
+    _controller.removeListener(onScroll);
     super.dispose();
   }
 
+  // Future refreshNotes() async {
+  //   setState(() => isLoading = true);
+  //   for (int i = 0; i <= verticalData.length; i++) {
+  //     await NotesDatabase.instance.create(Datamodeldetail(
+  //         href: verticalData[i].href,
+  //         center: verticalData[i].data[0].center.toString(),
+  //         title: verticalData[i].data[0].title,
+  //         //image: verticalData[i].links[0].href,
+  //         description: verticalData[i].data[0].description));
+  //   }
+  //   setState(() => isLoading = false);
+  // }
+
   Future _loadMore() async {
-    if (_isFirstLoadRunning == false &&
-        _isLoadMoreRunning == false &&
-        _controller.position.extentAfter < 300) {
+    if (_controller.position.extentAfter < 300) {
       setState(() {
-        _isLoadMoreRunning = true;
-        // Display a progress indicator at the bottom
+        isLoading = true;
       });
-      // Increase _page by 1
-      try {
-        final res = await http.get(Uri.parse(lasturi));
-        if (kDebugMode) {
-          print(nextUrl);
-        }
+      final res = await http.get(Uri.parse(nextUrl));
+      if (res.statusCode == 200) {
         final List<Item> fetchedPosts =
             imagemodelFromJson(res.body).collection.items;
         collection = imagemodelFromJson(res.body).collection;
@@ -86,35 +97,31 @@ class _DisplayApiState extends State<DisplayApi> {
         } else {
           nextUrl = collection!.links[1].href;
         }
+        print("next url:==$nextUrl");
         if (fetchedPosts.isNotEmpty) {
+          verticalData.addAll(fetchedPosts);
+          //refreshNotes();
           setState(() {
-            verticalData.addAll(fetchedPosts);
+            isLoading = false;
           });
         } else {
-          // This means there is no more data
-          // and therefore, we will not send another GET request
           setState(() {
-            _hasNextPage = false;
+            isLoading = false;
           });
         }
-      } catch (err) {
-        if (kDebugMode) {
-          setState(() {
-            _hasNextPage = false;
-          });
-          print('Something went wrong!');
-        }
+        setState(() {
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          isLoading = false;
+          _hasNextPage = false;
+          Container(
+            alignment: Alignment.center,
+            child: const Text("No Internet Connection"),
+          );
+        });
       }
-      setState(() {
-        _isLoadMoreRunning = false;
-      });
-    } else {
-      setState(() {
-        Container(
-          alignment: Alignment.center,
-          child: const Text("No Internet Connection"),
-        );
-      });
     }
   }
 
@@ -122,7 +129,13 @@ class _DisplayApiState extends State<DisplayApi> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Cubit Api Call"),
+        title: const Text(
+          "Cubit Api Call",
+          style: TextStyle(color: Colors.black),
+        ),
+        backgroundColor: Colors.white70,
+        iconTheme: const IconThemeData(color: Colors.black),
+        elevation: 6,
         actions: [
           IconButton(
             onPressed: () {
@@ -138,21 +151,19 @@ class _DisplayApiState extends State<DisplayApi> {
           ),
         ],
       ),
-      body: hideui
+      body: isFirstLoading == true
           ? Container(
               alignment: Alignment.center,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Image.asset(height: 80.0, width: 80.0, "images/no-wifi.png"),
-                  const SizedBox(
-                    height: 20.0,
+                children: const [
+                  CircularProgressIndicator(),
+                  SizedBox(
+                    height: 10,
                   ),
-                  const Text(
-                    "No Internet Connection",
-                    style:
-                        TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold),
-                  ),
+                  Text("Wait a Second",
+                      style:
+                          TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                 ],
               ),
             )
@@ -160,12 +171,13 @@ class _DisplayApiState extends State<DisplayApi> {
               children: [
                 Expanded(
                   child: ListView.builder(
-                    physics: const BouncingScrollPhysics(),
                     controller: _controller,
                     itemCount: verticalData.length,
                     itemBuilder: (context, index) {
                       return Card(
-                        color: Colors.white54,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15.0)),
+                        color: Colors.white70,
                         elevation: 6,
                         child: ListBody(
                           children: [
@@ -174,7 +186,8 @@ class _DisplayApiState extends State<DisplayApi> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                      builder: (context) => Details(),
+                                      builder: (context) =>
+                                          Details(model: verticalData[index]),
                                       settings: RouteSettings(
                                           arguments: verticalData[index])),
                                 );
@@ -190,8 +203,8 @@ class _DisplayApiState extends State<DisplayApi> {
                                       Padding(
                                           padding: const EdgeInsets.all(7),
                                           child: Image.network(
-                                            height: 82.0,
-                                            width: 80.0,
+                                            height: 100.0,
+                                            width: 100.0,
                                             fit: BoxFit.fill,
                                             verticalData[index].links != null &&
                                                     verticalData[index]
@@ -229,7 +242,7 @@ class _DisplayApiState extends State<DisplayApi> {
                                               fontWeight: FontWeight.bold,
                                               fontSize: 17),
                                         ),
-                                      )
+                                      ),
                                     ],
                                   ),
                                 ],
@@ -241,7 +254,7 @@ class _DisplayApiState extends State<DisplayApi> {
                     },
                   ),
                 ),
-                if (_isLoadMoreRunning == true)
+                if (isLoading == true)
                   Padding(
                     padding: const EdgeInsets.only(top: 4, bottom: 4),
                     child: Container(
@@ -254,10 +267,12 @@ class _DisplayApiState extends State<DisplayApi> {
                     padding: const EdgeInsets.only(top: 4, bottom: 4),
                     color: Colors.blue,
                     child: Container(
+                      height: 50.0,
                       alignment: Alignment.center,
                       child: const Text(
                         'You have fetched all of the Data',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 15.0),
                       ),
                     ),
                   )
@@ -266,34 +281,27 @@ class _DisplayApiState extends State<DisplayApi> {
     );
   }
 
-  void fetchData(String s) async {
-    // User defined class
+  Future fetchData(String s) async {
+    //checkConnectivity();
     try {
-      // if (s.isNotEmpty) {
-      // print("url : $s");
       setState(() {
-        _isFirstLoadRunning = true;
+        isFirstLoading = true;
       });
       final response = await http.get(Uri.parse(s));
       if (response.statusCode == 200) {
-        if (kDebugMode) {
-          print(response);
-        }
-        setState(() {
-          collection = imagemodelFromJson(response.body).collection;
-          verticalData.addAll(collection?.items ?? []);
-
-          // Nexturl = collection!.links[0].href;
-        });
+        collection = imagemodelFromJson(response.body).collection;
+        verticalData.addAll(collection?.items ?? []);
+        nextUrl = collection!.links[0].href;
+        //refreshNotes();
       }
-      // }
+      // }hah
     } catch (err) {
       if (kDebugMode) {
         print('Something went wrong ${err.toString()}');
       }
     }
     setState(() {
-      _isFirstLoadRunning = false;
+      isFirstLoading = false;
     });
   }
 
